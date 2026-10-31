@@ -174,16 +174,28 @@ natural = token nat
 
 expr :: Parser Int 
 expr = do t <- term 
-          (do symbol "+" 
+          let 
+            a = do
+              symbol "+"
               e <- expr 
-              return (t + e))
-            <|> return t
+              return (t + e)
+            s = do
+              symbol "-"
+              e <- expr
+              return (t - e)
+          a <|> s <|> return t
 term :: Parser Int 
 term = do f <- factor 
-          (do symbol "*" 
-              t <- term 
-              return (f * t))
-            <|> return f
+          let
+            m = do
+              symbol "*"
+              t <- term
+              return (f * t)
+            d = do
+              symbol "/"
+              t <- term
+              return (div f t)
+          m <|> d <|> return f
 factor :: Parser Int 
 factor = (do symbol "(" 
              e <- expr 
