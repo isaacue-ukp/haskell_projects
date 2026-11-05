@@ -1,0 +1,104 @@
+Task: one bounded, tool-free correctness review of selected Haskell cheat-sheet material. Respond in Chinese, at most 10 concise items. Identify concrete errors first, with corrected formula/code and brief reasoning; distinguish uncertainties. Do not approve based on tests, you have not run any. Do not propose expanding this two-page sheet into a tutorial.
+
+Original user request: Chinese Functional Programming/Haskell midterm quick-reference based on local lectures 1-15, concise, focused on important details worth looking up rather than memorizing. Lecture scope: types, syntax, lists, recursion, folds, ADTs, Countdown, IO, Functor/Applicative/Monad, custom StateTrans, deterministic list-result Parser, Semigroup/Monoid/Foldable/Traversable, lazy evaluation. Category theory is a separate appendix and excluded. Examples are independent reference equations/templates, not one compilable module.
+
+Selected draft (ASCII = often denotes mathematical equivalence):
+Function application associates left, arrows right. Composition right-first. Operator fixities listed:
+9R .; 9L !!; 8R ^,^^,**; 7L *,/,`div`,`mod`; 6L +,-; 5R :,++; 4N comparisons; 4L <$>,<*>,<*,*>; 3R &&; 3L <|>; 2R ||; 1L >>=,>>; 0R $,$!.
+(-2) is negative literal; subtract 2 is subtraction by 2.
+(\f x -> f (f x)) :: (a -> a) -> a -> a
+(\x y -> x == y) :: Eq a => a -> a -> Bool
+fromIntegral :: (Integral a, Num b) => a -> b
+(-5) `div` 2 = -3; (-5) `mod` 2 = 1
+
+foldr :: (a -> b -> b) -> b -> [a] -> b
+foldl :: (b -> a -> b) -> b -> [a] -> b
+foldr f z [a,b,c] = f a (f b (f c z))
+foldl f z [a,b,c] = f (f (f z a) b) c
+foldr (-) 0 [1,2,3] = 2; foldl (-) 0 [1,2,3] = -6
+The fold direction sets parentheses, and f need not be associative.
+length = foldr (\_ n -> 1+n) 0
+reverse = foldl (flip (:)) []
+filter p = foldr (\x ys -> if p x then x:ys else ys) []
+foldl is lazy, Data.List.foldl' forces the accumulator.
+
+data Tree a = Leaf a | Node (Tree a) (Tree a) deriving (Eq,Show)
+instance Foldable Tree where
+  foldMap f (Leaf x) = f x
+  foldMap f (Node l r) = foldMap f l <> foldMap f r
+instance Traversable Tree where
+  traverse f (Leaf x) = Leaf <$> f x
+  traverse f (Node l r) = Node <$> traverse f l <*> traverse f r
+(Functor Tree implementation is separately given.)
+newtype is a new type with one constructor/field, does not automatically enforce numeric range.
+
+State templates (pure and >>= are in corresponding instances):
+type State = Int
+newtype StateTrans a = ST (State -> (a,State))
+app (ST f) = f
+pure x = ST $ \s -> (x,s)
+st >>= k = ST $ \s -> let (x,s') = app st s in app (k x) s'
+fresh = ST $ \n -> (n,n+1)
+
+Function ((->) r) instances: fmap = (.); pure = const;
+(f <*> g) r = f r (g r)
+(h >>= k) r = k (h r) r
+List: pure x = [x]; fs <*> xs = [f x | f <- fs, x <- xs]; xs >>= f = concatMap f xs.
+
+Functor laws: fmap id = id; fmap (f.g) = fmap f . fmap g
+Applicative laws:
+pure id <*> u = u
+pure f <*> pure x = pure (f x)
+u <*> pure y = pure ($ y) <*> u
+pure (.) <*> u <*> v <*> w = u <*> (v <*> w)
+Monad laws:
+pure x >>= f = f x
+mx >>= pure = mx
+(mx >>= f) >>= g = mx >>= (\x -> f x >>= g)
+(f >=> g) x = f x >>= g
+return does not exit a do block.
+
+Parser assumes 0 or 1 result (per lecture):
+newtype Parser a = P (String -> [(a,String)])
+app (P f) = f
+pure x = P $ \s -> [(x,s)]
+p >>= k = P $ \s -> case app p s of { [] -> []; [(x,out)] -> app (k x) out }
+p <|> q = P $ \s -> case app p s of { [] -> app q s; rs -> rs }
+empty = P $ \_ -> []
+item = P $ \s -> case s of { [] -> []; (x:xs) -> [(x,xs)] }
+sat p = do { x <- item; if p x then pure x else empty }
+char c = sat (== c)
+many p = some p <|> pure []
+some p = (:) <$> p <*> many p
+nat = read <$> some (sat isDigit)
+space = many (sat isSpace) >> pure ()
+token p = do { space; x <- p; space; pure x }
+symbol s = token (string s)
+string [] = pure []
+string (x:xs) = (:) <$> char x <*> string xs
+expr = do { t <- term;
+  (do { symbol "+"; e <- expr; pure (t+e) }) <|> pure t }
+term = do { f <- factor;
+  (do { symbol "*"; t <- term; pure (f*t) }) <|> pure f }
+factor = (do { symbol "("; e <- expr; symbol ")"; pure e }) <|> token nat
+Here right recursion yields right associativity; * binds tighter than +. Check remaining input equals empty for complete parsing. many may diverge if parser succeeds without consuming input.
+
+Monoid requires Semigroup; <> associative, mempty two-sided identity. []: (++),[]; Sum: (+),0; Product: (*),1; All: (&&),True; Any: (||),False.
+fold :: (Foldable t, Monoid a) => t a -> a
+foldMap :: (Foldable t, Monoid b) => (a -> b) -> t a -> b
+fold = foldMap id
+Foldable minimal: foldMap or foldr.
+traverse :: (Traversable t, Applicative f) => (a -> f b) -> t a -> f (t b)
+sequenceA :: (Traversable t, Applicative f) => t (f a) -> f (t a)
+sequenceA = traverse id
+Traversable requires Functor and Foldable, preserves structure while gathering effects.
+
+Lazy evaluation = call by name + sharing. $! forces WHNF, not all nested fields.
+const 1 undefined = 1
+const 1 $! undefined = undefined
+const 1 $! [undefined] = 1
+fibs :: [Integer]
+fibs = 0:1:zipWith (+) fibs (tail fibs)
+foldr can produce from infinite input when f can avoid forcing its second argument; foldl must reach list end. length/reverse/sum generally cannot produce complete results from infinite lists.
+
+Question: Any factual/type/formula error in this material? Highlight subtle exam-relevant misreadings only. It is okay to return no issues if all are correct, but independently review.
