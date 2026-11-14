@@ -82,5 +82,5 @@ uv run --python 3.12 --with reportlab python FPslides/2026/work/build_haskell_on
 ## 约定
 
 - 作业放在 `Homework/LessonNN/`：正式作业用 `HWn.hs`，练习用 `NN-M.hs`。
-- 新增练习/实验放 `TestPrograms/` 或 `ProblemsByGPT/`；最小示范放 `examples/`。
+- 新增练习/实验放 `TestPrograms/` 或 `gpt-problems/`；最小示范放 `examples/`。
 - 不提交生成物：`*.agdai`、`__pycache__/`、`.stack-work/`、`*.hi`、`*.o` 等已在 `.gitignore` 中忽略。
