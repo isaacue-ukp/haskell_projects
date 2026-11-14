@@ -1,1 +1,19 @@
+# Haskell / Stack
+.stack-work/
+dist-newstyle/
+*.hi
+*.o
+*.dyn_hi
+*.dyn_o
+
+# Agda
 *.agdai
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+Thumbs.db
+desktop.ini
